@@ -1,0 +1,351 @@
+{
+  "name": "AI HTML Chatbot with Memory_Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "html-chatbot",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e3a80771-5144-4587-b350-4f18e3919d1b",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1088,
+        48
+      ],
+      "webhookId": "d7ed14e1-b570-4490-8671-87a41c573fe2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT latest_html FROM sessions WHERE session_id = '{{$json[\"body\"][\"session_id\"]}}';",
+        "additionalFields": {}
+      },
+      "id": "c6296a22-eb56-4d68-8937-0ad4fc287329",
+      "name": "Get Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        48
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "b6c6uib8qrSOIC92",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ !$json[\"latest_html\"] }}",
+              "value2": "={{ true }}"
+            },
+            {
+              "value1": "={{ $json.latest_html.length == 0  }}",
+              "value2": "={{ true }}"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "id": "fa5f6204-60bb-4e45-b24f-52d5d6c7c9d2",
+      "name": "Is First Prompt?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        48
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO sessions (session_id, latest_html, last_prompt, updated_at)\nVALUES (\n  '{{ $('Webhook').item.json.body.session_id }}',\n  '{{ $json.html.replace(/'/g, \"''\") }}',\n  '{{$('Webhook').item.json[\"body\"][\"prompt\"].replace(/'/g, \"''\")}}',\n  NOW()\n)\nON CONFLICT (session_id)\nDO UPDATE SET\n  latest_html = EXCLUDED.latest_html,\n  last_prompt = EXCLUDED.last_prompt,\n  updated_at = NOW();",
+        "additionalFields": {}
+      },
+      "id": "5252fdbf-8ba3-4bec-b0cb-fb254882402d",
+      "name": "Save Session",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        464,
+        176
+      ],
+      "alwaysOutputData": false,
+      "credentials": {
+        "postgres": {
+          "id": "b6c6uib8qrSOIC92",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "356770e7-3c83-48fb-8b6e-4ea052ab7560",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-2024-08-06\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a user interface designer and copy writter. Your job is to help users visualize their website ideas. You design elegant and simple webs, with professional text. You use Tailwind framework\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $('Webhook').item.json.body.prompt }}\"\n    }\n  ],\n  \"response_format\":\n{\n  \"type\": \"json_schema\",\n  \"json_schema\": {\n    \"name\": \"ui\",\n    \"description\": \"Dynamically generated UI\",\n    \"strict\": true,\n    \"schema\": {\n      \"type\": \"object\",\n      \"properties\": {\n        \"type\": {\n          \"type\": \"string\",\n          \"description\": \"The type of the UI component\",\n          \"enum\": [\n  \"div\",\n  \"span\",\n  \"a\",\n  \"p\",\n  \"h1\",\n  \"h2\",\n  \"h3\",\n  \"h4\",\n  \"h5\",\n  \"h6\",\n  \"ul\",\n  \"ol\",\n  \"li\",\n  \"img\",\n  \"button\",\n  \"input\",\n  \"textarea\",\n  \"select\",\n  \"option\",\n  \"label\",\n  \"form\",\n  \"table\",\n  \"thead\",\n  \"tbody\",\n  \"tr\",\n  \"th\",\n  \"td\",\n  \"nav\",\n  \"header\",\n  \"footer\",\n  \"section\",\n  \"article\",\n  \"aside\",\n  \"main\",\n  \"figure\",\n  \"figcaption\",\n  \"blockquote\",\n  \"q\",\n  \"hr\",\n  \"code\",\n  \"pre\",\n  \"iframe\",\n  \"video\",\n  \"audio\",\n  \"canvas\",\n  \"svg\",\n  \"path\",\n  \"circle\",\n  \"rect\",\n  \"line\",\n  \"polyline\",\n  \"polygon\",\n  \"g\",\n  \"use\",\n  \"symbol\"\n]\n        },\n        \"label\": {\n          \"type\": \"string\",\n          \"description\": \"The label of the UI component, used for buttons or form fields\"\n        },\n        \"children\": {\n          \"type\": \"array\",\n          \"description\": \"Nested UI components\",\n          \"items\": {\n            \"$ref\": \"#\"\n          }\n        },\n        \"attributes\": {\n          \"type\": \"array\",\n          \"description\": \"Arbitrary attributes for the UI component, suitable for any element using Tailwind framework\",\n          \"items\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"name\": {\n                \"type\": \"string\",\n                \"description\": \"The name of the attribute, for example onClick or className\"\n              },\n              \"value\": {\n                \"type\": \"string\",\n                \"description\": \"The value of the attribute using the Tailwind framework classes\"\n              }\n            },\n            \"additionalProperties\": false,\n            \"required\": [\"name\", \"value\"]\n          }\n        }\n      },\n      \"required\": [\"type\", \"label\", \"children\", \"attributes\"],\n      \"additionalProperties\": false\n    }\n  }\n}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -480,
+        -80
+      ],
+      "id": "ac2e41fd-40fd-4834-9094-c8dd6a73a2bc",
+      "name": "HTTP Request",
+      "credentials": {
+        "openAiApi": {
+          "id": "gfbHAmSBTmdllyW0",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a backend API that returns strictly valid JSON.\n\nYour task is to convert the given JSON input into a webpage.\n\nYou MUST return ONLY a valid JSON object with exactly these fields:\n{\n  \"title\": \"string\",\n  \"html\": \"string\"\n}\n\nRules:\n- Do NOT return any explanation\n- Do NOT wrap output in markdown or code blocks\n- Do NOT add any extra fields\n- The \"html\" field must contain complete HTML (<!DOCTYPE html> ...)\n- The \"title\" field must be a short descriptive page title\n- Ensure the JSON is valid and parsable"
+            },
+            {
+              "content": "={{ $json.choices[0].message.content }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -288,
+        -80
+      ],
+      "id": "419ba8b4-3396-4b0d-8a09-dcebf0daca8b",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "gfbHAmSBTmdllyW0",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n\n<html>\n<head>\n  <meta charset=\"UTF-8\" />\n    <script src=\"https://cdn.tailwindcss.com\"></script>\n  <title>{{ $json.output[0].content[0].text.title }}</title>\n</head>\n<body>\n{{ $json.output[0].content[0].text.html }}\n</body>\n</html>"
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        64
+      ],
+      "id": "551a4b8f-7533-49c3-a33d-1ec6f13ff606",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a user interface designer and copy writer. Your job is to help users visualize their website ideas. You design elegant and simple webs, with professional text. You use Tailwind framework. We already have html code from the first iteration. You need to update the html code as per the last prompt.\n\n\n\nYou MUST return ONLY a valid JSON object with exactly these fields:\n{\n  \"title\": \"string\",\n  \"html\": \"string\"\n}\n\nRules:\n- Do NOT return any explanation\n- Do NOT wrap output in markdown or code blocks\n- Do NOT add any extra fields\n- The \"html\" field must contain complete HTML (<!DOCTYPE html> ...)\n- The \"title\" field must be a short descriptive page title\n- Ensure the JSON is valid and able to parse it"
+            },
+            {
+              "content": "=Old html : {{ $json.latest_html }}\nLast prompt : {{ $('Webhook').item.json.body.prompt }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        -288,
+        176
+      ],
+      "id": "7466074f-4d57-4c3f-9438-5ff268f354a5",
+      "name": "Message a model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "gfbHAmSBTmdllyW0",
+          "name": "OpenAI account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Session": {
+      "main": [
+        [
+          {
+            "node": "Is First Prompt?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is First Prompt?": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session": {
+      "main": [
+        []
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Save Session",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model2": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "01ca44de-77d2-4854-a166-0b9772b352f0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f8821079838a8bc46b7a802c29cc926cb210bf2babea642ec130938a48210e6a"
+  },
+  "id": "12JGXmnfD9wtTgMb",
+  "tags": []
+}
